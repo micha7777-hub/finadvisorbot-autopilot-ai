@@ -9,6 +9,7 @@ interface StatCardProps {
   trendValue?: string;
   icon?: React.ReactNode;
   className?: string;
+  action?: React.ReactNode;
 }
 
 export function StatCard({
@@ -18,6 +19,7 @@ export function StatCard({
   trendValue,
   icon,
   className,
+  action,
 }: StatCardProps) {
   return (
     <Card className={cn("overflow-hidden", className)}>
@@ -48,6 +50,12 @@ export function StatCard({
             </div>
           )}
         </div>
+        
+        {action && (
+          <div className="mt-4 flex justify-end">
+            {action}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
