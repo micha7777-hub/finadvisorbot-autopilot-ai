@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { DashboardCard } from "@/components/ui/dashboard-card";
 import { Card } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
@@ -7,28 +7,50 @@ import { PortfolioAllocationChart } from "@/components/charts/PortfolioAllocatio
 import { PortfolioHistoryChart } from "@/components/charts/PortfolioHistoryChart";
 import { SentimentHeatmap } from "@/components/charts/SentimentHeatmap";
 import { Switch } from "@/components/ui/switch";
-import { BarChart, ChartPie, Activity, TrendingUp, Plus, DollarSign } from "lucide-react";
+import { BarChart, ChartPie, Activity, TrendingUp, Plus, DollarSign, Save } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { mockPortfolio, mockPortfolioHistory } from "@/services/mockData";
+import { mockPortfolioHistory } from "@/services/mockData";
 import { SentimentBadge } from "@/components/ui/sentiment-badge";
 import { toast } from "sonner";
 import { AddStockForm } from "@/components/portfolio/AddStockForm";
 import { CashBalanceForm } from "@/components/portfolio/CashBalanceForm";
 import { PortfolioNews } from "@/components/portfolio/PortfolioNews";
+import { usePortfolio, StockHolding } from "@/services/portfolioService";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Portfolio: React.FC = () => {
+  const { user } = useAuth();
+  const { saveUserPortfolio, loadUserPortfolio } = usePortfolio();
+  
   const [autopilotEnabled, setAutopilotEnabled] = useState(false);
-  const [userPortfolio, setUserPortfolio] = useState(mockPortfolio);
+  const [userPortfolio, setUserPortfolio] = useState<StockHolding[]>([]);
   const [cashBalance, setCashBalance] = useState(10000); // Default cash balance
   const [showAddStockForm, setShowAddStockForm] = useState(false);
   const [showCashForm, setShowCashForm] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
+  // Load user portfolio on initial render
+  useEffect(() => {
+    const loadedPortfolio = loadUserPortfolio();
+    if (loadedPortfolio) {
+      setUserPortfolio(loadedPortfolio.stocks);
+      setCashBalance(loadedPortfolio.cashBalance);
+      toast.success("Portfolio loaded successfully");
+    }
+  }, []);
+  
+  // Handle deleting a stock
   const handleDeleteStock = (symbol: string) => {
     setUserPortfolio(prev => prev.filter(stock => stock.symbol !== symbol));
     toast.success(`Removed ${symbol} from portfolio`);
+    
+    // Save portfolio after deletion
+    const updatedPortfolio = userPortfolio.filter(stock => stock.symbol !== symbol);
+    saveUserPortfolio(updatedPortfolio, cashBalance);
   };
   
+  // Handle adding a stock
   const handleAddStock = (stock: any) => {
     // Check if stock already exists
     if (userPortfolio.some(s => s.symbol === stock.symbol)) {
@@ -36,7 +58,33 @@ const Portfolio: React.FC = () => {
       return;
     }
     
-    setUserPortfolio(prev => [...prev, stock]);
+    const updatedPortfolio = [...userPortfolio, stock];
+    setUserPortfolio(updatedPortfolio);
+    
+    // Save portfolio after addition
+    saveUserPortfolio(updatedPortfolio, cashBalance);
+  };
+  
+  // Handle updating cash balance
+  const handleUpdateCash = (newBalance: number) => {
+    setCashBalance(newBalance);
+    
+    // Save portfolio after updating cash
+    saveUserPortfolio(userPortfolio, newBalance);
+  };
+  
+  // Handle manual save
+  const handleSavePortfolio = () => {
+    setIsSaving(true);
+    
+    try {
+      saveUserPortfolio(userPortfolio, cashBalance);
+      toast.success("Portfolio saved successfully");
+    } catch (error) {
+      toast.error("Failed to save portfolio");
+    } finally {
+      setIsSaving(false);
+    }
   };
   
   // Calculate portfolio totals including cash
@@ -81,23 +129,33 @@ const Portfolio: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold mb-1">My Portfolio</h1>
           <p className="text-muted-foreground">
-            Your investments at a glance with AI-enhanced insights
+            Welcome back, {user?.name || "Investor"}! Here's your portfolio overview
           </p>
         </div>
-        <div className="flex items-center mt-4 md:mt-0 space-x-2 bg-muted/50 p-2 rounded-lg">
-          <Label htmlFor="autopilot" className="font-medium">
-            AutoPilot Mode
-          </Label>
-          <Switch
-            id="autopilot"
-            checked={autopilotEnabled}
-            onCheckedChange={setAutopilotEnabled}
-          />
-          {autopilotEnabled ? (
-            <span className="text-xs text-success bg-success/10 px-2 py-1 rounded-md">Active</span>
-          ) : (
-            <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md">Off</span>
-          )}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mt-4 md:mt-0">
+          <Button 
+            onClick={handleSavePortfolio} 
+            disabled={isSaving}
+            className="flex items-center"
+          >
+            <Save className="mr-2 h-4 w-4" />
+            {isSaving ? "Saving..." : "Save Portfolio"}
+          </Button>
+          <div className="flex items-center space-x-2 bg-muted/50 p-2 rounded-lg">
+            <Label htmlFor="autopilot" className="font-medium">
+              AutoPilot Mode
+            </Label>
+            <Switch
+              id="autopilot"
+              checked={autopilotEnabled}
+              onCheckedChange={setAutopilotEnabled}
+            />
+            {autopilotEnabled ? (
+              <span className="text-xs text-success bg-success/10 px-2 py-1 rounded-md">Active</span>
+            ) : (
+              <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md">Off</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -305,7 +363,7 @@ const Portfolio: React.FC = () => {
       />
       
       <CashBalanceForm
-        onUpdateCash={setCashBalance}
+        onUpdateCash={handleUpdateCash}
         currentCash={cashBalance}
         isOpen={showCashForm}
         onClose={() => setShowCashForm(false)}

@@ -3,9 +3,20 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "react-router-dom";
+import { UserCircle, LogOut } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const AppHeader: React.FC = () => {
   const location = useLocation();
+  const { user, logout } = useAuth();
   
   return (
     <header className="bg-background border-b p-4 sticky top-0 z-30">
@@ -53,6 +64,25 @@ export const AppHeader: React.FC = () => {
           >
             <Link to="/settings">Settings</Link>
           </Button>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <UserCircle className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>
+                {user?.name}
+                <p className="text-xs font-normal text-muted-foreground">{user?.email}</p>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={logout} className="text-destructive">
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>
