@@ -4,7 +4,7 @@ import { DashboardCard } from "@/components/ui/dashboard-card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SentimentBadge } from "@/components/ui/sentiment-badge";
-import { Search } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
 import { mockStockDetails } from "@/services/mockData";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -12,6 +12,20 @@ const SentimentSearch: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStock, setSelectedStock] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [searchSuggestions, setSearchSuggestions] = useState<Array<{symbol: string, name: string}>>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // List of available stocks for search suggestions
+  const availableStocks = [
+    { symbol: "AAPL", name: "Apple Inc." },
+    { symbol: "MSFT", name: "Microsoft Corporation" },
+    { symbol: "GOOGL", name: "Alphabet Inc." },
+    { symbol: "AMZN", name: "Amazon.com Inc." },
+    { symbol: "META", name: "Meta Platforms Inc." },
+    { symbol: "TSLA", name: "Tesla Inc." },
+    { symbol: "NVDA", name: "NVIDIA Corporation" },
+    { symbol: "AMD", name: "Advanced Micro Devices, Inc." },
+  ];
 
   const handleSearch = () => {
     if (!searchTerm) return;
@@ -29,7 +43,38 @@ const SentimentSearch: React.FC = () => {
         console.log("Stock not found");
       }
       setIsLoading(false);
+      setShowSuggestions(false);
     }, 1000);
+  };
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    
+    if (value.length > 1) {
+      // Filter suggestions based on input
+      const filtered = availableStocks.filter(
+        stock => 
+          stock.symbol.toLowerCase().includes(value.toLowerCase()) || 
+          stock.name.toLowerCase().includes(value.toLowerCase())
+      );
+      setSearchSuggestions(filtered);
+      setShowSuggestions(true);
+    } else {
+      setSearchSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+  
+  const selectSuggestion = (stock: {symbol: string, name: string}) => {
+    setSearchTerm(stock.symbol);
+    setShowSuggestions(false);
+    // Auto-search after selection
+    setTimeout(() => {
+      if (mockStockDetails[stock.symbol as keyof typeof mockStockDetails]) {
+        setSelectedStock(stock.symbol);
+      }
+    }, 100);
   };
 
   // Generate mock price history data for the chart
@@ -66,20 +111,46 @@ const SentimentSearch: React.FC = () => {
         </p>
       </div>
 
-      <div className="flex space-x-4">
-        <div className="relative flex-1">
-          <Input
-            placeholder="Enter stock symbol (e.g., AAPL, NVDA)"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full"
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-          />
+      <div className="relative">
+        <div className="flex space-x-4">
+          <div className="relative flex-1">
+            <Input
+              placeholder="Search by company name or symbol (e.g., Apple, AAPL)"
+              value={searchTerm}
+              onChange={handleInputChange}
+              className="w-full"
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              onFocus={() => searchTerm && setShowSuggestions(true)}
+            />
+            {showSuggestions && searchSuggestions.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-md">
+                {searchSuggestions.map((stock) => (
+                  <div
+                    key={stock.symbol}
+                    className="p-2 hover:bg-muted cursor-pointer flex justify-between"
+                    onClick={() => selectSuggestion(stock)}
+                  >
+                    <span className="font-medium">{stock.symbol}</span>
+                    <span className="text-muted-foreground">{stock.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <Button onClick={handleSearch} disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Searching...
+              </>
+            ) : (
+              <>
+                Search
+                <Search className="ml-2 h-4 w-4" />
+              </>
+            )}
+          </Button>
         </div>
-        <Button onClick={handleSearch} disabled={isLoading}>
-          {isLoading ? "Searching..." : "Search"}
-          {!isLoading && <Search className="ml-2 h-4 w-4" />}
-        </Button>
       </div>
 
       {selectedStock && stockInfo && (
@@ -227,10 +298,10 @@ const SentimentSearch: React.FC = () => {
           <div className="bg-muted/50 p-8 rounded-lg">
             <h3 className="text-xl font-medium mb-2">No results found</h3>
             <p className="text-muted-foreground mb-4">
-              We couldn't find any stock matching "{searchTerm}". Please try another symbol.
+              We couldn't find any stock matching "{searchTerm}". Please try another symbol or company name.
             </p>
             <p className="text-sm">
-              Try searching for: AAPL, NVDA
+              Available stocks for demo: AAPL, NVDA
             </p>
           </div>
         </div>
@@ -242,15 +313,15 @@ const SentimentSearch: React.FC = () => {
             <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-xl font-medium mb-2">Search for a stock</h3>
             <p className="text-muted-foreground">
-              Enter a stock symbol above to view sentiment analysis, news, and AI-generated insights.
+              Enter a company name or stock symbol above to view sentiment analysis, news, and AI-generated insights.
             </p>
             <div className="mt-4 text-sm">
               <p className="font-medium mb-1">Popular searches:</p>
               <div className="flex flex-wrap justify-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setSearchTerm("AAPL")}>
+                <Button variant="outline" size="sm" onClick={() => selectSuggestion({symbol: "AAPL", name: "Apple Inc."})}>
                   AAPL
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setSearchTerm("NVDA")}>
+                <Button variant="outline" size="sm" onClick={() => selectSuggestion({symbol: "NVDA", name: "NVIDIA Corporation"})}>
                   NVDA
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setSearchTerm("MSFT")}>
