@@ -79,7 +79,7 @@ export const mockNewsData = [
   },
   {
     id: '3',
-    title: 'Apple's AR Headset Launch Delayed Again, Supply Chain Issues Cited',
+    title: 'Apple\'s AR Headset Launch Delayed Again, Supply Chain Issues Cited',
     summary: 'Apple has announced another delay in the launch of its augmented reality headset, citing ongoing supply chain challenges affecting production timelines.',
     source: 'Bloomberg',
     url: '#',
@@ -138,7 +138,7 @@ export const mockStockDetails = {
     news: [
       {
         id: '101',
-        title: 'Apple's AR Headset Launch Delayed Again, Supply Chain Issues Cited',
+        title: 'Apple\'s AR Headset Launch Delayed Again, Supply Chain Issues Cited',
         summary: 'Apple has announced another delay in the launch of its augmented reality headset, citing ongoing supply chain challenges affecting production timelines.',
         source: 'Bloomberg',
         publishedAt: '2025-05-11T08:37:00Z',
@@ -148,7 +148,7 @@ export const mockStockDetails = {
       {
         id: '102',
         title: 'Apple Reports Record Services Revenue, iPhone Sales Steady',
-        summary: 'Apple's latest quarterly report shows record revenue from services while iPhone sales remained steady despite market challenges.',
+        summary: 'Apple\'s latest quarterly report shows record revenue from services while iPhone sales remained steady despite market challenges.',
         source: 'CNBC',
         publishedAt: '2025-05-10T14:22:00Z',
         sentiment: 'positive',
@@ -201,7 +201,7 @@ export const mockStockDetails = {
       {
         id: '203',
         title: 'Semiconductor Supply Chain Normalization Could Impact NVIDIA Margins',
-        summary: 'Industry analysts note that normalizing semiconductor supply chains could affect NVIDIA's historically high margins as competition intensifies.',
+        summary: 'Industry analysts note that normalizing semiconductor supply chains could affect NVIDIA\'s historically high margins as competition intensifies.',
         source: 'Barron\'s',
         publishedAt: '2025-05-09T16:30:00Z',
         sentiment: 'neutral',
