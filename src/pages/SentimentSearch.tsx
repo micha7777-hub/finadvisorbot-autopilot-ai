@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { DashboardCard } from "@/components/ui/dashboard-card";
 import { Button } from "@/components/ui/button";
@@ -175,7 +174,7 @@ const SentimentSearch: React.FC = () => {
         </p>
       </div>
 
-      <DashboardCard>
+      <DashboardCard title="Search Stocks">
         <MultiTickerSearch 
           onSearch={handleSearch}
           isLoading={isLoading}
