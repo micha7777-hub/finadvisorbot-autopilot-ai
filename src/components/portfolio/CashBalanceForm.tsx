@@ -20,13 +20,15 @@ interface CashBalanceFormProps {
   currentCash: number;
   isOpen: boolean;
   onClose: () => void;
+  isFirstTime?: boolean;
 }
 
 export const CashBalanceForm: React.FC<CashBalanceFormProps> = ({ 
   onUpdateCash, 
   currentCash,
   isOpen,
-  onClose
+  onClose,
+  isFirstTime = false
 }) => {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -39,7 +41,7 @@ export const CashBalanceForm: React.FC<CashBalanceFormProps> = ({
 
   const onSubmit = (values: FormValues) => {
     onUpdateCash(values.cash);
-    toast.success(`Cash balance updated to $${values.cash.toLocaleString()}`);
+    toast.success(`Cash balance ${isFirstTime ? 'set' : 'updated'} to $${values.cash.toLocaleString()}`);
     onClose();
   };
 
@@ -48,7 +50,14 @@ export const CashBalanceForm: React.FC<CashBalanceFormProps> = ({
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
       <div className="bg-background rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold mb-4">Update Cash Balance</h2>
+        <h2 className="text-xl font-bold mb-4">
+          {isFirstTime ? 'Set Initial Cash Balance' : 'Update Cash Balance'}
+        </h2>
+        {isFirstTime && (
+          <p className="text-muted-foreground mb-4">
+            Welcome to your portfolio! Start by entering how much cash you want to begin investing with.
+          </p>
+        )}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -69,12 +78,14 @@ export const CashBalanceForm: React.FC<CashBalanceFormProps> = ({
             />
 
             <div className="flex justify-end space-x-2 pt-2">
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
+              {!isFirstTime && (
+                <Button type="button" variant="outline" onClick={onClose}>
+                  Cancel
+                </Button>
+              )}
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Update Balance
+                {isFirstTime ? 'Get Started' : 'Update Balance'}
               </Button>
             </div>
           </form>

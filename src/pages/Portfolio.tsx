@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from "react";
 import { DashboardCard } from "@/components/ui/dashboard-card";
-import { Card } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { PortfolioAllocationChart } from "@/components/charts/PortfolioAllocationChart";
 import { PortfolioHistoryChart } from "@/components/charts/PortfolioHistoryChart";
@@ -10,67 +9,132 @@ import { Switch } from "@/components/ui/switch";
 import { BarChart, ChartPie, Activity, TrendingUp, Plus, DollarSign, Save } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { mockPortfolioHistory } from "@/services/mockData";
 import { SentimentBadge } from "@/components/ui/sentiment-badge";
 import { toast } from "sonner";
 import { AddStockForm } from "@/components/portfolio/AddStockForm";
 import { CashBalanceForm } from "@/components/portfolio/CashBalanceForm";
 import { PortfolioNews } from "@/components/portfolio/PortfolioNews";
-import { usePortfolio, StockHolding } from "@/services/portfolioService";
+import { usePortfolio, StockHolding, Portfolio as PortfolioType, updatePortfolioHistory } from "@/services/portfolioService";
 import { useAuth } from "@/contexts/AuthContext";
 
 const Portfolio: React.FC = () => {
   const { user } = useAuth();
-  const { saveUserPortfolio, loadUserPortfolio } = usePortfolio();
+  const { saveUserPortfolio, loadUserPortfolio, updatePortfolio } = usePortfolio();
   
   const [autopilotEnabled, setAutopilotEnabled] = useState(false);
-  const [userPortfolio, setUserPortfolio] = useState<StockHolding[]>([]);
-  const [cashBalance, setCashBalance] = useState(10000); // Default cash balance
+  const [userPortfolio, setUserPortfolio] = useState<PortfolioType>({
+    stocks: [],
+    cashBalance: 0,
+    lastUpdated: '',
+    portfolioHistory: []
+  });
   const [showAddStockForm, setShowAddStockForm] = useState(false);
   const [showCashForm, setShowCashForm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
   
   // Load user portfolio on initial render
   useEffect(() => {
-    const loadedPortfolio = loadUserPortfolio();
-    if (loadedPortfolio) {
-      setUserPortfolio(loadedPortfolio.stocks);
-      setCashBalance(loadedPortfolio.cashBalance);
-      toast.success("Portfolio loaded successfully");
+    if (user) {
+      const loadedPortfolio = loadUserPortfolio();
+      setUserPortfolio(loadedPortfolio);
+      
+      // Check if this is a new user (no stocks and zero cash)
+      if (loadedPortfolio.stocks.length === 0 && loadedPortfolio.cashBalance === 0) {
+        setIsFirstTimeUser(true);
+        setShowCashForm(true);
+      } else {
+        toast.success("Portfolio loaded successfully");
+      }
     }
-  }, []);
+  }, [user]);
+  
+  // Calculate portfolio totals including cash
+  const stockValue = userPortfolio.stocks.reduce(
+    (sum, stock) => sum + stock.shares * stock.price,
+    0
+  );
+  
+  const portfolioValue = stockValue + userPortfolio.cashBalance;
+  
+  const portfolioCost = userPortfolio.stocks.reduce(
+    (sum, stock) => sum + stock.shares * stock.costBasis,
+    0
+  ) + userPortfolio.cashBalance;
+  
+  const portfolioGain = portfolioValue - portfolioCost;
+  const portfolioGainPercent = portfolioCost > 0 ? (portfolioGain / portfolioCost) * 100 : 0;
   
   // Handle deleting a stock
   const handleDeleteStock = (symbol: string) => {
-    setUserPortfolio(prev => prev.filter(stock => stock.symbol !== symbol));
-    toast.success(`Removed ${symbol} from portfolio`);
+    const updatedStocks = userPortfolio.stocks.filter(stock => stock.symbol !== symbol);
+    const updatedPortfolio = {
+      ...userPortfolio,
+      stocks: updatedStocks
+    };
     
-    // Save portfolio after deletion
-    const updatedPortfolio = userPortfolio.filter(stock => stock.symbol !== symbol);
-    saveUserPortfolio(updatedPortfolio, cashBalance);
+    // Update portfolio with new value in history
+    const finalPortfolio = updatePortfolioHistory(
+      updatedPortfolio, 
+      updatedStocks.reduce((sum, s) => sum + s.shares * s.price, 0) + userPortfolio.cashBalance
+    );
+    
+    setUserPortfolio(finalPortfolio);
+    saveUserPortfolio(finalPortfolio);
+    
+    toast.success(`Removed ${symbol} from portfolio`);
   };
   
   // Handle adding a stock
-  const handleAddStock = (stock: any) => {
+  const handleAddStock = (stock: StockHolding) => {
     // Check if stock already exists
-    if (userPortfolio.some(s => s.symbol === stock.symbol)) {
+    if (userPortfolio.stocks.some(s => s.symbol === stock.symbol)) {
       toast.error(`${stock.symbol} is already in your portfolio`);
       return;
     }
     
-    const updatedPortfolio = [...userPortfolio, stock];
-    setUserPortfolio(updatedPortfolio);
+    const updatedPortfolio = {
+      ...userPortfolio,
+      stocks: [...userPortfolio.stocks, stock]
+    };
     
-    // Save portfolio after addition
-    saveUserPortfolio(updatedPortfolio, cashBalance);
+    // Update portfolio with new value in history
+    const newPortfolioValue = updatedPortfolio.stocks.reduce(
+      (sum, s) => sum + s.shares * s.price, 0
+    ) + userPortfolio.cashBalance;
+    
+    const finalPortfolio = updatePortfolioHistory(updatedPortfolio, newPortfolioValue);
+    
+    setUserPortfolio(finalPortfolio);
+    saveUserPortfolio(finalPortfolio);
+    
+    toast.success(`Added ${stock.shares} shares of ${stock.symbol} to your portfolio`);
   };
   
   // Handle updating cash balance
   const handleUpdateCash = (newBalance: number) => {
-    setCashBalance(newBalance);
+    const updatedPortfolio = {
+      ...userPortfolio,
+      cashBalance: newBalance
+    };
     
-    // Save portfolio after updating cash
-    saveUserPortfolio(userPortfolio, newBalance);
+    // Update portfolio with new value in history
+    const newPortfolioValue = userPortfolio.stocks.reduce(
+      (sum, s) => sum + s.shares * s.price, 0
+    ) + newBalance;
+    
+    const finalPortfolio = updatePortfolioHistory(updatedPortfolio, newPortfolioValue);
+    
+    setUserPortfolio(finalPortfolio);
+    saveUserPortfolio(finalPortfolio);
+    
+    // Show different message for first-time users
+    if (isFirstTimeUser) {
+      toast.success(`Starting cash balance set to $${newBalance.toLocaleString()}`);
+      setIsFirstTimeUser(false);
+    } else {
+      toast.success(`Cash balance updated to $${newBalance.toLocaleString()}`);
+    }
   };
   
   // Handle manual save
@@ -78,7 +142,13 @@ const Portfolio: React.FC = () => {
     setIsSaving(true);
     
     try {
-      saveUserPortfolio(userPortfolio, cashBalance);
+      const updatedPortfolio = updatePortfolioHistory(
+        userPortfolio, 
+        portfolioValue
+      );
+      
+      saveUserPortfolio(updatedPortfolio);
+      setUserPortfolio(updatedPortfolio);
       toast.success("Portfolio saved successfully");
     } catch (error) {
       toast.error("Failed to save portfolio");
@@ -87,25 +157,9 @@ const Portfolio: React.FC = () => {
     }
   };
   
-  // Calculate portfolio totals including cash
-  const stockValue = userPortfolio.reduce(
-    (sum, stock) => sum + stock.shares * stock.price,
-    0
-  );
-  
-  const portfolioValue = stockValue + cashBalance;
-  
-  const portfolioCost = userPortfolio.reduce(
-    (sum, stock) => sum + stock.shares * stock.costBasis,
-    0
-  ) + cashBalance;
-  
-  const portfolioGain = portfolioValue - portfolioCost;
-  const portfolioGainPercent = portfolioCost > 0 ? (portfolioGain / portfolioCost) * 100 : 0;
-  
   // Format data for allocation chart, including cash
   const allocationData = [
-    ...userPortfolio.map((stock) => ({
+    ...userPortfolio.stocks.map((stock) => ({
       symbol: stock.symbol,
       name: stock.name,
       value: stock.shares * stock.price,
@@ -113,15 +167,27 @@ const Portfolio: React.FC = () => {
     {
       symbol: "CASH",
       name: "Cash Balance",
-      value: cashBalance,
+      value: userPortfolio.cashBalance,
     }
   ];
   
-  // Get yesterday's and today's values for daily change calculation
-  const today = mockPortfolioHistory[mockPortfolioHistory.length - 1].value;
-  const yesterday = mockPortfolioHistory[mockPortfolioHistory.length - 2].value;
-  const dailyChange = today - yesterday;
-  const dailyChangePercent = (dailyChange / yesterday) * 100;
+  // Get daily change from portfolio history
+  const calculateDailyChange = () => {
+    const history = userPortfolio.portfolioHistory;
+    if (history.length < 2) return { change: 0, changePercent: 0 };
+    
+    const today = history[history.length - 1]?.value || 0;
+    const yesterday = history[history.length - 2]?.value || 0;
+    
+    if (yesterday === 0) return { change: 0, changePercent: 0 };
+    
+    const change = today - yesterday;
+    const changePercent = (change / yesterday) * 100;
+    
+    return { change, changePercent };
+  };
+  
+  const { change: dailyChange, changePercent: dailyChangePercent } = calculateDailyChange();
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -178,7 +244,7 @@ const Portfolio: React.FC = () => {
         
         <StatCard
           title="Cash Balance"
-          value={`$${cashBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+          value={`$${userPortfolio.cashBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
           icon={<DollarSign className="h-5 w-5 text-primary" />}
           action={
             <Button size="sm" variant="outline" onClick={() => setShowCashForm(true)}>
@@ -189,7 +255,7 @@ const Portfolio: React.FC = () => {
         
         <StatCard
           title="Holdings"
-          value={`${userPortfolio.length}`}
+          value={`${userPortfolio.stocks.length}`}
           icon={<ChartPie className="h-5 w-5 text-primary" />}
           action={
             <Button size="sm" variant="outline" onClick={() => setShowAddStockForm(true)}>
@@ -200,19 +266,48 @@ const Portfolio: React.FC = () => {
         />
       </div>
 
+      {/* Display welcome message for first-time users */}
+      {isFirstTimeUser && (
+        <div className="bg-primary/10 text-primary p-4 rounded-lg mb-6 border border-primary/20">
+          <h2 className="font-bold text-lg mb-2">Welcome to Your Financial Dashboard!</h2>
+          <p className="mb-4">Get started by adding your initial cash balance and then add some stocks to your portfolio.</p>
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={() => setShowCashForm(true)}>
+              Set Initial Cash Balance
+            </Button>
+            <Button variant="outline" onClick={() => setShowAddStockForm(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add Your First Stock
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <DashboardCard
           title="Portfolio Performance"
           description="Historical value of your investments"
         >
-          <PortfolioHistoryChart data={mockPortfolioHistory} />
+          {userPortfolio.portfolioHistory.length > 0 ? (
+            <PortfolioHistoryChart data={userPortfolio.portfolioHistory} />
+          ) : (
+            <div className="flex items-center justify-center h-[300px]">
+              <p className="text-muted-foreground">No portfolio history available yet</p>
+            </div>
+          )}
         </DashboardCard>
         
         <DashboardCard
           title="Asset Allocation"
           description="Distribution of your current investments"
         >
-          <PortfolioAllocationChart data={allocationData} />
+          {portfolioValue > 0 ? (
+            <PortfolioAllocationChart data={allocationData} />
+          ) : (
+            <div className="flex items-center justify-center h-[300px]">
+              <p className="text-muted-foreground">Add stocks to see your asset allocation</p>
+            </div>
+          )}
         </DashboardCard>
       </div>
 
@@ -220,7 +315,7 @@ const Portfolio: React.FC = () => {
         title="Holdings"
         description="Individual stocks in your portfolio with real-time data"
       >
-        {userPortfolio.length > 0 ? (
+        {userPortfolio.stocks.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -238,7 +333,7 @@ const Portfolio: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {userPortfolio.map((stock) => {
+                {userPortfolio.stocks.map((stock) => {
                   const stockValue = stock.shares * stock.price;
                   const stockCost = stock.shares * stock.costBasis;
                   const stockGain = stockValue - stockCost;
@@ -280,7 +375,7 @@ const Portfolio: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 flex justify-center">
                         <SentimentBadge 
-                          sentiment={sentiment as any}
+                          sentiment={sentiment as "positive" | "neutral" | "negative"}
                           score={stock.sentimentScore}
                           showScore={true}
                         />
@@ -312,14 +407,14 @@ const Portfolio: React.FC = () => {
         )}
       </DashboardCard>
       
-      <PortfolioNews portfolio={userPortfolio} />
+      {userPortfolio.stocks.length > 0 && <PortfolioNews portfolio={userPortfolio.stocks} />}
       
-      {userPortfolio.length > 0 && (
+      {userPortfolio.stocks.length > 0 && (
         <DashboardCard
           title="Sentiment Heatmap"
           description="Visual representation of sentiment across your holdings"
         >
-          <SentimentHeatmap data={userPortfolio} />
+          <SentimentHeatmap data={userPortfolio.stocks} />
         </DashboardCard>
       )}
       
@@ -334,7 +429,7 @@ const Portfolio: React.FC = () => {
               <h3 className="font-medium text-primary">AutoPilot is running</h3>
             </div>
             <p className="text-sm mb-4">
-              The RL agent is actively monitoring market conditions and sentiment data to optimize your portfolio. Last adjustment was made on May 10, 2025.
+              The AI agent is actively monitoring market conditions and sentiment data to optimize your portfolio. Last adjustment was made on May 12, 2025.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 text-sm">
               <div className="bg-background p-3 rounded-md border flex-1">
@@ -347,7 +442,7 @@ const Portfolio: React.FC = () => {
               </div>
               <div className="bg-background p-3 rounded-md border flex-1">
                 <div className="font-medium mb-1">Next Scheduled Review</div>
-                <p>May 12, 2025 (Tomorrow)</p>
+                <p>May 13, 2025 (Today)</p>
                 <Button variant="outline" size="sm" className="mt-2">View Strategy Details</Button>
               </div>
             </div>
@@ -364,9 +459,10 @@ const Portfolio: React.FC = () => {
       
       <CashBalanceForm
         onUpdateCash={handleUpdateCash}
-        currentCash={cashBalance}
+        currentCash={userPortfolio.cashBalance}
         isOpen={showCashForm}
         onClose={() => setShowCashForm(false)}
+        isFirstTime={isFirstTimeUser}
       />
     </div>
   );
